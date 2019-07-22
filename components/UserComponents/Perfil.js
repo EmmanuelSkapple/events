@@ -39,7 +39,6 @@ export default class Perfil extends Component {
             PerfilData:[],
           })
         }
-
     })
   }
 
@@ -69,7 +68,7 @@ export default class Perfil extends Component {
            name={'md-log-out'} size={50}
            color={'rgba(0,0,0, 0.7)'}
            style={{marginTop:30}}
-           OnPress={() => this.handleItemClick(firebase.auth().signOut() )}
+           onPress={() => firebase.auth().signOut() }
            />
        </View>
       </View>

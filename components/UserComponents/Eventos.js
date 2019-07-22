@@ -7,11 +7,14 @@ import {
     TouchableOpacity,
     View,
     TouchableNativeFeedback,
-    Modal,
     Dimensions,
     Image,
     ScrollView,
 } from 'react-native';
+import Modal from "react-native-modal";
+
+import { LinearGradient } from 'expo-linear-gradient'
+
 import Icon from 'react-native-vector-icons/Ionicons'
 import DatePicker from 'react-native-datepicker'
 const Direccion = 'https://server02.herokuapp.com';
@@ -44,7 +47,6 @@ export default class Eventos extends Component {
 
     GetEventos=()=>{
       var self=this;
-      console.log('antes de tomar');
       axios.get(Direccion+`/TomarEventosAll`)
         .then(res => {
           console.log(res.data);
@@ -77,7 +79,6 @@ export default class Eventos extends Component {
                         this.state.Cards.map((it,key)=>{
                           return(<CardEventos callbackGetEnventos={this.GetEventos}  it={it} key={key}/>)
                         })
-
                       }
                       </View>
                     </ScrollView>
@@ -100,6 +101,10 @@ export default class Eventos extends Component {
          active:'',
          openCard:false,
          Asistentes:[],
+         isModalVisible:false,
+         IdEvento:'',
+         Existente:false,
+         HoraCliente:0,
          };
 
      }
@@ -111,8 +116,11 @@ export default class Eventos extends Component {
          .then(res => {
            console.log(res.data);
            if (res.data) {
+             let Zonacliente = new Date().toString().match(/([-\+][0-9]+)\s/)[1]
+             let Diferencia = (parseInt(this.props.it.Zona)-parseInt(Zonacliente.substring(0,3)));
              this.setState({
-               Asistentes:res.data
+               Asistentes:res.data,
+               HoraCliente:parseInt(this.props.it.Hora)-Diferencia,
              })
             }
            else {
@@ -124,23 +132,36 @@ export default class Eventos extends Component {
            throw error;
          });
 
+
+
      }
 
+    toggleModal = () => {
+      this.setState({ isModalVisible: !this.state.isModalVisible });
+      this.props.callbackGetEnventos(true);
+
+    };
 
      registrarseEvento=()=>{
        console.log(Direccion+`/RegistroEvento`);
        var self=this;
-       let eventoId = this.props.it.key;
+       let Eventoinfo = {key:this.props.it.key,Nombre:this.props.it.Nombre,Image:this.props.it.Image};
        let FounderId = this.props.it.Fundador;
 
-       axios.post(Direccion+`/AsistirEvento`,{userId:firebase.auth().currentUser.uid,AsistenteName:firebase.auth().currentUser.displayName,eventInfo:eventoId,FounderId:FounderId})
+       axios.post(Direccion+`/AsistirEvento`,{userId:firebase.auth().currentUser.uid,AsistenteName:firebase.auth().currentUser.displayName,eventInfo:Eventoinfo,FounderId:FounderId})
          .then(res => {
-           console.log(res.data);
-           if (res.data) {
-           this.props.callbackGetEnventos(true);
+           if (res.data!='404') {
+            this.setState({
+              isModalVisible:true,
+              IdEvento:firebase.auth().currentUser.uid,
+            })
            }
            else {
-           alert("Ups hubo un error");
+             this.setState({
+               isModalVisible:true,
+               IdEvento:firebase.auth().currentUser.uid,
+               Existente:true,
+             })
            }
 
        }).catch(function(error) {
@@ -152,24 +173,29 @@ export default class Eventos extends Component {
      render() {
        let users="";
        let moreUser="";
+
        if (this.state.Asistentes) {
          users = this.state.Asistentes.length-2;
-         moreUser = users>0?users:'';
+         moreUser = users>0?users:0;
+         console.log(this.state.Asistentes);
        }
 
          return (
-           <View style={{marginTop:15}}>
+           <LinearGradient
+                colors={['#F4AC86', '#FDB2A9']}
+                style={[CardStyles.Linearcontent,shadow]}
+              >
            {!this.state.openCard?
 
-             <View style={{ borderBottomLeftRadius: 40, borderBottomRightRadius: 40,borderWidth:1, width:WIDTH-60, borderColor:'gray' ,marginBottom:20}}>
+             <View style={{ borderBottomLeftRadius: 20, borderBottomRightRadius: 20, width:WIDTH-60 ,marginBottom:20}}>
              <TouchableNativeFeedback
                  onPress={() => this.setState({ openCard: true}) }
-                  style={{height:200 ,marginBottom:5}}
+                  style={{height:240 ,marginBottom:5}}
                  >
 
                  <View style={{alignItems: 'center'}}>
                      <View>
-                      <Image style={{width:WIDTH-60}} source={require('../../assets/event.jpeg')}/>
+                      <Image style={{width:WIDTH-60,height:180, borderTopRightRadius:10,borderTopLeftRadius:10}} source={{uri:this.props.it.Image}}/>
                      </View>
 
                        <View style={{flex: 1,  marginLeft:5}}>
@@ -180,17 +206,17 @@ export default class Eventos extends Component {
 
                         </View>
                        <View>
-                       {this.state.Asistentes?
-                         <View>
-                         {moreUser?
-                           <Text style={{fontSize: 24, fontWeight: '700', paddingBottom: 8}}>{this.state.Asistentes[0].Nombre},{this.state.Asistentes[1].Nombre} y {moreUser} personas mas asistiran   </Text>
-                           :
-                           <Text style={{fontSize: 24, fontWeight: '700', paddingBottom: 8}}>{this.state.Asistentes[0].Nombre} </Text>
-                         }
-                         </View>
+                       {this.state.Asistentes.length>=1?
+                           <View>
+                             {this.state.Asistentes.length>=2?
+                               <Text style={{fontSize: 14, fontWeight: '300', paddingBottom: 8}}>{this.state.Asistentes[0]},{this.state.Asistentes[1]} y {moreUser} personas mas asistiran   </Text>
+                               :
+                               <Text style={{fontSize: 14, fontWeight: '300', paddingBottom: 8,marginTop:20}}>{this.state.Asistentes[0]} asistira </Text>
+                             }
+                           </View>
                          :
                          <View>
-                         <Text style={{fontSize: 24, fontWeight: '700', paddingBottom: 8}}>Aun no hay asistentes</Text>
+                         <Text style={{fontSize: 14, fontWeight: '300', paddingBottom: 8,marginTop:20}}>Aun no hay asistentes</Text>
 
                          </View>
                        }
@@ -200,7 +226,7 @@ export default class Eventos extends Component {
              </TouchableNativeFeedback>
             </View>
             :
-            <View style={{ borderBottomLeftRadius: 40, borderBottomRightRadius: 40, borderWidth:1, width:WIDTH-60, borderColor:'gray' ,marginBottom:20}}>
+            <View style={{ borderBottomLeftRadius: 20, borderBottomRightRadius: 20, width:WIDTH-60,marginBottom:20}}>
             <TouchableNativeFeedback
                 onPress={() => this.setState({ openCard: false}) }
                  style={{height:300 ,marginBottom:20}}
@@ -208,7 +234,6 @@ export default class Eventos extends Component {
 
                 <View style={{alignItems: 'center'}}>
                   <View style={{flex: 1,  marginLeft:5}}>
-
                     <Text style={{fontSize: 12,marginLeft:3, fontWeight: '500', color: 'gray', paddingBottom: 10}}>Pais</Text>
                     <Text style={{fontSize: 18, fontWeight: '700', paddingBottom: 8}}>{this.props.it.Pais}</Text>
 
@@ -226,6 +251,8 @@ export default class Eventos extends Component {
 
                     <Text style={{fontSize: 12,marginLeft:3, fontWeight: '500', color: 'gray',marginTop:20}}>Precio </Text>
                     <Text style={{fontSize: 30, fontWeight: '700', paddingBottom: 8}}>$ {this.props.it.Precio} </Text>
+                    <Text style={{alignItems:'center',fontSize: 18,marginLeft:3, fontWeight: '200', color: 'gray'}}>Hora: {this.state.HoraCliente}:{this.props.it.Minutos}</Text>
+
                   </View>
                     <TouchableOpacity
                       style={styles.btnRegistrase}
@@ -235,22 +262,88 @@ export default class Eventos extends Component {
                     </TouchableOpacity >
                 </View>
             </TouchableNativeFeedback>
-            </View>
-
-           }
-
           </View>
+           }
+           <Modal isVisible={this.state.isModalVisible}>
+             <View style={CardStyles.backgroundModal}>
+                 {!this.props.Existente?
+                   <View>
+                   <Text style={{alignItems:'center',fontSize: 30,marginLeft:3, fontWeight: '500', color: 'gray'}}>Felicidades</Text>
+                   <Text style={{alignItems:'center',fontSize: 13,marginLeft:3, fontWeight: '300', color: 'gray'}}>Este es el codigo de tu entrada</Text>
+                   <Text style={{alignItems:'center',fontSize: 18,marginLeft:3, fontWeight: '200', color: 'gray'}}>{this.state.IdEvento}</Text>
+
+                   </View>
+                   :
+                   <View>
+                   <Text style={{alignItems:'center',fontSize: 30,marginLeft:3, fontWeight: '500', color: 'gray'}}>Lo Sentimos</Text>
+                   <Text style={{alignItems:'center',fontSize: 13,marginLeft:3, fontWeight: '300', color: 'gray'}}>Ya estas registrado en este evento</Text>
+                   <Text style={{alignItems:'center',fontSize: 13,marginLeft:3, fontWeight: '300', color: 'gray'}}>Este es el codigo de tu entrada</Text>
+                   <Text style={{alignItems:'center',fontSize: 18,marginLeft:3, fontWeight: '200', color: 'gray'}}>{this.state.IdEvento}</Text>
+
+                   </View>
+                 }
+
+               <TouchableOpacity
+                 style={CardStyles.btnAceptarModal}
+                 onPress={this.toggleModal}
+                 >
+                 <Text style={styles.textButton}>Aceptar</Text>
+               </TouchableOpacity >
+
+             </View>
+           </Modal>
+           </LinearGradient>
          )
      }
  }
+
+
+
 
  const CardStyles = StyleSheet.create({
 
    container:{
      width:290,
+   },
+
+   Linearcontent:{
+     flex: 1,
+     marginTop:15,
+     marginBottom:25,
+     borderTopRightRadius:20,
+     borderTopLeftRadius:20,
+     borderBottomLeftRadius: 20,
+     borderBottomRightRadius: 20,
+     width:WIDTH-60,
+
+   },
+
+   btnAceptarModal:{
+     width: WIDTH-120,
+     height:45,
+     borderRadius: 25,
+     backgroundColor:'#5CC27A',
+     justifyContent:'center',
+     marginBottom:5,
+   },
+
+   backgroundModal:{
+     flex:1,
+     backgroundColor:'#F8E5E1',
+     marginTop:HEIGHT/2,
+     borderRadius: 20,
+     alignItems:'center',
+
    }
  })
 
+ const shadow = {
+   shadowColor: '#30C1DD',
+   shadowRadius: 30,
+   shadowOpacity: 0.6,
+   elevation: 20,
+   shadowOffset: {width: 10,height: 10}
+ }
 
   const styles = StyleSheet.create({
     cardContent:{
@@ -297,7 +390,6 @@ export default class Eventos extends Component {
       width: (WIDTH/2)-20,
       height:35,
       borderRadius:45,
-      fontSize:16,
       textAlign:'center',
       color: 'rgba(0,0,0,0.7)',
       borderColor: 'black',
